@@ -347,6 +347,16 @@ impl eframe::App for QuickHostsApp {
             }
         }
 
+        // Command+M (macOS) / Ctrl+M shortcut to minimize window
+        let minimize_requested = ui.input_mut(|i| {
+            i.consume_key(egui::Modifiers::COMMAND, egui::Key::M)
+                || i.consume_key(egui::Modifiers::MAC_CMD, egui::Key::M)
+        });
+
+        if minimize_requested {
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+        }
+
         // Auto-dismiss expired toast
         if let Some(t) = &self.toast {
             if t.is_expired() {

@@ -409,6 +409,15 @@ pub fn render_custom_dialog_overlay(
             return;
         }
 
+        let minimize_dialog = ctx.input_mut(|i| {
+            i.consume_key(egui::Modifiers::COMMAND, egui::Key::M)
+                || i.consume_key(egui::Modifiers::MAC_CMD, egui::Key::M)
+        });
+
+        if minimize_dialog {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+        }
+
         egui::CentralPanel::default()
             .frame(
                 egui::Frame::new()
