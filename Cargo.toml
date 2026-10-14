@@ -1,0 +1,65 @@
+[package]
+name = "quickhosts"
+version = "0.1.0"
+edition = "2021"
+authors = ["QuickHosts Team"]
+license = "MIT OR Apache-2.0"
+description = "A fast, lightweight cross-platform Hosts switcher and manager built with Rust"
+
+[dependencies]
+egui = "0.35"
+eframe = { version = "0.35", default-features = false, features = ["default_fonts", "wayland", "x11", "glow"] }
+tokio = { version = "1.53", default-features = false, features = ["rt-multi-thread", "macros"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+uuid = { version = "1.15", features = ["v4", "serde"] }
+dirs = "6.0"
+arboard = "3.4"
+open = "5.3"
+sys-locale = "0.3"
+rfd = "0.15"
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[package.metadata.deb]
+name = "io.github.geekdex.quickhosts"
+maintainer = "GeekDex <dev@geekdex.io>"
+copyright = "2026 GeekDex"
+extended-description = """A fast, lightweight cross-platform Hosts switcher and manager built with Rust."""
+depends = "$auto"
+section = "net"
+priority = "optional"
+assets = [
+    ["target/release/quickhosts", "usr/bin/quickhosts", "755"],
+    ["assets/io.github.geekdex.quickhosts.desktop", "usr/share/applications/", "644"],
+    ["assets/icons/16x16/apps/io.github.geekdex.quickhosts.png", "usr/share/icons/hicolor/16x16/apps/", "644"],
+    ["assets/icons/32x32/apps/io.github.geekdex.quickhosts.png", "usr/share/icons/hicolor/32x32/apps/", "644"],
+    ["assets/icons/48x48/apps/io.github.geekdex.quickhosts.png", "usr/share/icons/hicolor/48x48/apps/", "644"],
+    ["assets/icons/64x64/apps/io.github.geekdex.quickhosts.png", "usr/share/icons/hicolor/64x64/apps/", "644"],
+    ["assets/icons/128x128/apps/io.github.geekdex.quickhosts.png", "usr/share/icons/hicolor/128x128/apps/", "644"],
+    ["assets/icons/256x256/apps/io.github.geekdex.quickhosts.png", "usr/share/icons/hicolor/256x256/apps/", "644"],
+    ["assets/icons/512x512/apps/io.github.geekdex.quickhosts.png", "usr/share/icons/hicolor/512x512/apps/", "644"],
+    ["assets/pixmaps/io.github.geekdex.quickhosts.png", "usr/share/pixmaps/io.github.geekdex.quickhosts.png", "644"],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/quickhosts", dest = "/usr/bin/quickhosts", mode = "755" },
+    { source = "assets/io.github.geekdex.quickhosts.desktop", dest = "/usr/share/applications/io.github.geekdex.quickhosts.desktop", mode = "644" },
+    { source = "assets/icons/16x16/apps/io.github.geekdex.quickhosts.png", dest = "/usr/share/icons/hicolor/16x16/apps/io.github.geekdex.quickhosts.png", mode = "644" },
+    { source = "assets/icons/32x32/apps/io.github.geekdex.quickhosts.png", dest = "/usr/share/icons/hicolor/32x32/apps/io.github.geekdex.quickhosts.png", mode = "644" },
+    { source = "assets/icons/48x48/apps/io.github.geekdex.quickhosts.png", dest = "/usr/share/icons/hicolor/48x48/apps/io.github.geekdex.quickhosts.png", mode = "644" },
+    { source = "assets/icons/64x64/apps/io.github.geekdex.quickhosts.png", dest = "/usr/share/icons/hicolor/64x64/apps/io.github.geekdex.quickhosts.png", mode = "644" },
+    { source = "assets/icons/128x128/apps/io.github.geekdex.quickhosts.png", dest = "/usr/share/icons/hicolor/128x128/apps/io.github.geekdex.quickhosts.png", mode = "644" },
+    { source = "assets/icons/256x256/apps/io.github.geekdex.quickhosts.png", dest = "/usr/share/icons/hicolor/256x256/apps/io.github.geekdex.quickhosts.png", mode = "644" },
+    { source = "assets/icons/512x512/apps/io.github.geekdex.quickhosts.png", dest = "/usr/share/icons/hicolor/512x512/apps/io.github.geekdex.quickhosts.png", mode = "644" },
+    { source = "assets/pixmaps/io.github.geekdex.quickhosts.png", dest = "/usr/share/pixmaps/io.github.geekdex.quickhosts.png", mode = "644" },
+]

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=QuickHosts
+Comment=A fast, lightweight Hosts switcher and manager
+Exec=quickhosts %u
+Icon=io.github.geekdex.quickhosts
+Terminal=false
+Type=Application
+Categories=Network;Development;Utility;
+StartupWMClass=io.github.geekdex.quickhosts
+Keywords=hosts;dns;switch;network;
