@@ -397,7 +397,14 @@ pub fn render_custom_dialog_overlay(
         visuals.window_fill = theme.bg_elevated;
         ctx.set_visuals(visuals);
 
-        if ctx.input(|i| i.viewport().close_requested()) {
+        let close_dialog = ctx.input(|i| i.viewport().close_requested())
+            || ctx.input_mut(|i| {
+                i.consume_key(egui::Modifiers::COMMAND, egui::Key::W)
+                    || i.consume_key(egui::Modifiers::MAC_CMD, egui::Key::W)
+                    || i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)
+            });
+
+        if close_dialog {
             state.close();
             return;
         }

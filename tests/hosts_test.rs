@@ -438,3 +438,36 @@ fn test_initial_default_config_state() {
     assert!(!serialized.contains("K8s 测试集群"));
     assert!(!serialized.contains("自定义内部服务 mappings"));
 }
+
+#[test]
+fn test_icon_assets_transparency() {
+    use image::GenericImageView;
+
+    let check_icon = |path: &str, expected_size: (u32, u32)| {
+        let bytes = std::fs::read(path).unwrap_or_else(|_| panic!("Failed to read {}", path));
+        let img = image::load_from_memory(&bytes).unwrap_or_else(|_| panic!("Failed to load {}", path));
+        assert_eq!(img.dimensions(), expected_size, "Dimensions mismatch for {}", path);
+        let rgba = img.to_rgba8();
+        let (w, h) = rgba.dimensions();
+
+        // Ensure all 4 outer corners are transparent (alpha == 0)
+        assert_eq!(rgba.get_pixel(0, 0)[3], 0, "Top-left corner not transparent for {}", path);
+        assert_eq!(rgba.get_pixel(w - 1, 0)[3], 0, "Top-right corner not transparent for {}", path);
+        assert_eq!(rgba.get_pixel(0, h - 1)[3], 0, "Bottom-left corner not transparent for {}", path);
+        assert_eq!(rgba.get_pixel(w - 1, h - 1)[3], 0, "Bottom-right corner not transparent for {}", path);
+
+        // Ensure center pixel is non-transparent
+        assert!(rgba.get_pixel(w / 2, h / 2)[3] > 200, "Center should be opaque for {}", path);
+    };
+
+    check_icon("icon.png", (1024, 1024));
+    check_icon("assets/icons/512x512/apps/io.github.geekdex.quickhosts.png", (512, 512));
+    check_icon("assets/icons/256x256/apps/io.github.geekdex.quickhosts.png", (256, 256));
+    check_icon("assets/pixmaps/io.github.geekdex.quickhosts.png", (256, 256));
+    check_icon("assets/icons/128x128/apps/io.github.geekdex.quickhosts.png", (128, 128));
+    check_icon("assets/icons/64x64/apps/io.github.geekdex.quickhosts.png", (64, 64));
+    check_icon("assets/icons/48x48/apps/io.github.geekdex.quickhosts.png", (48, 48));
+    check_icon("assets/icons/32x32/apps/io.github.geekdex.quickhosts.png", (32, 32));
+    check_icon("assets/icons/16x16/apps/io.github.geekdex.quickhosts.png", (16, 16));
+}
+

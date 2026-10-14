@@ -47,6 +47,7 @@ pub struct QuickHostsApp {
     pub preview_search: String,
     pub editor_search: crate::ui::editor::EditorSearchState,
     pub status_message: Option<(String, bool)>,
+    pub toast: Option<widgets::Toast>,
     pub runtime: Runtime,
     pub tx: Sender<AsyncMessage>,
     pub rx: Receiver<AsyncMessage>,
@@ -57,6 +58,10 @@ pub struct QuickHostsApp {
 }
 
 impl QuickHostsApp {
+    pub fn show_toast(&mut self, msg: impl Into<String>, kind: widgets::ToastKind) {
+        self.toast = Some(widgets::Toast::new(msg, kind));
+    }
+
     pub fn new(
         cc: &eframe::CreationContext<'_>,
         instance_guard: Option<SingleInstanceGuard>,
@@ -138,6 +143,7 @@ impl QuickHostsApp {
             preview_search: String::new(),
             editor_search: crate::ui::editor::EditorSearchState::default(),
             status_message: None,
+            toast: None,
             runtime: rt,
             tx,
             rx,
@@ -205,7 +211,7 @@ impl QuickHostsApp {
         }
     }
 
-    pub fn apply_system_hosts(&mut self) {
+    pub fn apply_system_hosts(&mut self, notify: bool) {
         let active_hosts: Vec<&HostItem> = self.config.hosts.iter().filter(|h| h.enabled).collect();
 
         let combined = build_combined_hosts(self.config.master_enabled, &active_hosts);
@@ -219,6 +225,12 @@ impl QuickHostsApp {
                     chrono::Local::now().format("%H:%M:%S"),
                     msg
                 ));
+                if notify {
+                    self.show_toast(
+                        tr(&self.config.language, "toast_apply_success"),
+                        widgets::ToastKind::Success,
+                    );
+                }
             }
             Err(err) => {
                 let msg = format!("❌ Failed to write system hosts: {}", err);
@@ -228,6 +240,12 @@ impl QuickHostsApp {
                     chrono::Local::now().format("%H:%M:%S"),
                     msg
                 ));
+                if notify {
+                    self.show_toast(
+                        format!("{}: {}", tr(&self.config.language, "toast_apply_failed"), err),
+                        widgets::ToastKind::Error,
+                    );
+                }
             }
         }
     }
@@ -257,9 +275,13 @@ impl QuickHostsApp {
                         self.logs.push(log_entry);
                     }
                     self.status_message = Some(("🌐 Remote hosts updated!".to_string(), false));
+                    self.show_toast(
+                        tr(&self.config.language, "toast_remote_fetch_success"),
+                        widgets::ToastKind::Success,
+                    );
                     let _ = save_config(&self.config);
                     if self.config.auto_apply_on_change {
-                        self.apply_system_hosts();
+                        self.apply_system_hosts(false);
                     }
                 }
                 AsyncMessage::RemoteFetchFailed { id, error } => {
@@ -282,13 +304,22 @@ impl QuickHostsApp {
                         self.logs.push(log_entry);
                     }
                     self.status_message = Some((format!("⚠️ Remote fetch error: {}", error), true));
+                    self.show_toast(
+                        format!("{}: {}", tr(&self.config.language, "toast_remote_fetch_failed"), error),
+                        widgets::ToastKind::Error,
+                    );
                 }
                 AsyncMessage::SystemWriteResult { success, msg } => {
-                    self.status_message = Some((msg, !success));
+                    self.status_message = Some((msg.clone(), !success));
+                    self.show_toast(
+                        msg,
+                        if success { widgets::ToastKind::Success } else { widgets::ToastKind::Error },
+                    );
                 }
                 AsyncMessage::InstanceFocusRequested => {
                     let msg = tr(&self.config.language, "already_running_desc").to_string();
                     self.status_message = Some((format!("ℹ️ {}", msg), false));
+                    self.show_toast(msg.clone(), widgets::ToastKind::Info);
                     self.logs.push(format!(
                         "[{}] {}",
                         chrono::Local::now().format("%H:%M:%S"),
@@ -302,11 +333,32 @@ impl QuickHostsApp {
 
 impl eframe::App for QuickHostsApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        // Command+W (macOS) / Ctrl+W (Windows/Linux) shortcut to close window or dialog
+        let close_requested = ui.input_mut(|i| {
+            i.consume_key(egui::Modifiers::COMMAND, egui::Key::W)
+                || i.consume_key(egui::Modifiers::MAC_CMD, egui::Key::W)
+        });
+
+        if close_requested {
+            if self.dialog_state.mode != dialogs::DialogMode::None {
+                self.dialog_state.close();
+            } else {
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+        }
+
+        // Auto-dismiss expired toast
+        if let Some(t) = &self.toast {
+            if t.is_expired() {
+                self.toast = None;
+            }
+        }
+
         self.process_async_messages();
 
         if let Some(instant) = self.pending_auto_apply_at {
             if instant.elapsed() >= std::time::Duration::from_millis(1200) {
-                self.apply_system_hosts();
+                self.apply_system_hosts(false);
                 self.pending_auto_apply_at = None;
             } else {
                 ui.ctx()
@@ -543,7 +595,7 @@ impl eframe::App for QuickHostsApp {
                     if action.state_changed {
                         let _ = save_config(&self.config);
                         if self.config.auto_apply_on_change {
-                            self.apply_system_hosts();
+                            self.apply_system_hosts(false);
                         }
                     }
                 });
@@ -671,7 +723,7 @@ impl eframe::App for QuickHostsApp {
                                         self.config.selected_host_id = self.config.hosts.first().map(|h| h.id.clone());
                                         let _ = save_config(&self.config);
                                         if self.config.auto_apply_on_change {
-                                            self.apply_system_hosts();
+                                            self.apply_system_hosts(false);
                                         }
                                     }
                                 }
@@ -695,12 +747,16 @@ impl eframe::App for QuickHostsApp {
                                 );
 
                                 if action.apply_to_system {
-                                    self.apply_system_hosts();
+                                    self.apply_system_hosts(true);
                                 }
                                 if action.copy_to_clipboard {
                                     if let Ok(mut cb) = arboard::Clipboard::new() {
                                         let _ = cb.set_text(combined_content);
                                         self.status_message = Some(("Combined system hosts copied to clipboard!".to_string(), false));
+                                        self.show_toast(
+                                            tr(&lang, "toast_copy_all_success"),
+                                            widgets::ToastKind::Success,
+                                        );
                                     }
                                 }
                             }
@@ -803,6 +859,7 @@ impl eframe::App for QuickHostsApp {
                                             let full_log = self.logs.join("\n");
                                             let _ = cb.set_text(full_log);
                                             self.status_message = Some(("日志已复制到剪贴板！".to_string(), false));
+                                            self.show_toast(tr(&lang, "toast_log_copied"), widgets::ToastKind::Success);
                                         }
                                     }
                                 });
@@ -917,7 +974,7 @@ impl eframe::App for QuickHostsApp {
                                                         if toggle_switch(ui, &mut self.config.master_enabled).changed() {
                                                             let _ = save_config(&self.config);
                                                             if self.config.auto_apply_on_change {
-                                                                self.apply_system_hosts();
+                                                                self.apply_system_hosts(true);
                                                             }
                                                         }
                                                     });
@@ -1041,6 +1098,7 @@ impl eframe::App for QuickHostsApp {
                                                                     if let Ok(mut cb) = arboard::Clipboard::new() {
                                                                         let _ = cb.set_text(sys_path);
                                                                         self.status_message = Some(("系统 Hosts 文件路径已复制！".to_string(), false));
+                                                                        self.show_toast(tr(&lang, "toast_path_copied"), widgets::ToastKind::Success);
                                                                     }
                                                                 }
                                                             });
@@ -1072,7 +1130,10 @@ impl eframe::App for QuickHostsApp {
             self.fetch_single_remote(&id);
         }
         if apply_needed {
-            self.apply_system_hosts();
+            self.apply_system_hosts(true);
         }
+
+        // --- Global Floating Toast Notifications ---
+        widgets::render_toast_overlay(ui.ctx(), &self.toast, &theme);
     }
 }

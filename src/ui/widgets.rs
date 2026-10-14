@@ -368,3 +368,134 @@ pub fn antd_badge(ui: &mut Ui, text: &str, bg: Color32, text_color: Color32) {
             );
         });
 }
+
+// ==========================================
+//  Modern Floating Toast Component
+// ==========================================
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ToastKind {
+    Success,
+    Info,
+    Warning,
+    Error,
+}
+
+#[derive(Debug, Clone)]
+pub struct Toast {
+    pub message: String,
+    pub kind: ToastKind,
+    pub created_at: std::time::Instant,
+    pub duration: std::time::Duration,
+}
+
+impl Toast {
+    pub fn new(message: impl Into<String>, kind: ToastKind) -> Self {
+        let duration = match kind {
+            ToastKind::Error => std::time::Duration::from_millis(3500),
+            _ => std::time::Duration::from_millis(2500),
+        };
+        Self {
+            message: message.into(),
+            kind,
+            created_at: std::time::Instant::now(),
+            duration,
+        }
+    }
+
+    pub fn is_expired(&self) -> bool {
+        self.created_at.elapsed() >= self.duration
+    }
+}
+
+pub fn render_toast_overlay(
+    ctx: &egui::Context,
+    toast: &Option<Toast>,
+    theme: &SwitchHostsTheme,
+) {
+    let Some(t) = toast else {
+        return;
+    };
+
+    let elapsed = t.created_at.elapsed();
+    if elapsed >= t.duration {
+        return;
+    }
+
+    // Request repaint so toast smoothly disappears when duration elapses
+    let remaining = t.duration.saturating_sub(elapsed);
+    ctx.request_repaint_after(remaining.min(std::time::Duration::from_millis(40)));
+
+    // Calculate fade in / fade out alpha multiplier
+    let total_ms = t.duration.as_millis() as f32;
+    let elapsed_ms = elapsed.as_millis() as f32;
+    let alpha_factor = if elapsed_ms < 150.0 {
+        elapsed_ms / 150.0
+    } else if total_ms - elapsed_ms < 250.0 {
+        ((total_ms - elapsed_ms) / 250.0).clamp(0.0, 1.0)
+    } else {
+        1.0
+    };
+
+    let (icon_symbol, icon_color, border_color) = match t.kind {
+        ToastKind::Success => ("✔", theme.success, theme.success),
+        ToastKind::Info => ("ℹ", theme.primary, theme.primary),
+        ToastKind::Warning => ("⚠", theme.warning, theme.warning),
+        ToastKind::Error => ("✖", theme.danger, theme.danger),
+    };
+
+    let bg_color = Color32::from_rgba_unmultiplied(
+        theme.bg_elevated.r(),
+        theme.bg_elevated.g(),
+        theme.bg_elevated.b(),
+        (250.0 * alpha_factor).round() as u8,
+    );
+    let border_stroke_color = Color32::from_rgba_unmultiplied(
+        border_color.r(),
+        border_color.g(),
+        border_color.b(),
+        (180.0 * alpha_factor).round() as u8,
+    );
+    let text_color = Color32::from_rgba_unmultiplied(
+        theme.text_primary.r(),
+        theme.text_primary.g(),
+        theme.text_primary.b(),
+        (255.0 * alpha_factor).round() as u8,
+    );
+    let icon_draw_color = Color32::from_rgba_unmultiplied(
+        icon_color.r(),
+        icon_color.g(),
+        icon_color.b(),
+        (255.0 * alpha_factor).round() as u8,
+    );
+
+    egui::Area::new(egui::Id::new("app_toast_overlay"))
+        .order(egui::Order::Foreground)
+        .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 32.0))
+        .interactable(false)
+        .show(ctx, |ui| {
+            egui::Frame::new()
+                .fill(bg_color)
+                .stroke(Stroke::new(1.0, border_stroke_color))
+                .corner_radius(CornerRadius::same(8))
+                .inner_margin(Margin::symmetric(18, 10))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 8.0;
+                        ui.label(
+                            egui::RichText::new(icon_symbol)
+                                .font(FontId::proportional(15.0))
+                                .color(icon_draw_color)
+                                .strong(),
+                        );
+                        ui.label(
+                            egui::RichText::new(&t.message)
+                                .font(FontId::proportional(13.5))
+                                .color(text_color)
+                                .strong(),
+                        );
+                    });
+                });
+        });
+}
+
