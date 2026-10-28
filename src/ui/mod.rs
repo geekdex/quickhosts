@@ -682,6 +682,19 @@ impl eframe::App for QuickHostsApp {
                             }
                         }
                     }
+                    if let Some((from_idx, to_idx)) = action.reorder {
+                        if from_idx < self.config.hosts.len()
+                            && to_idx < self.config.hosts.len()
+                            && from_idx != to_idx
+                        {
+                            let item = self.config.hosts.remove(from_idx);
+                            self.config.hosts.insert(to_idx, item);
+                            let _ = save_config(&self.config);
+                            if self.config.auto_apply_on_change {
+                                self.apply_system_hosts(false);
+                            }
+                        }
+                    }
                     if action.state_changed {
                         let _ = save_config(&self.config);
                         if self.config.auto_apply_on_change {

@@ -583,6 +583,28 @@ fn test_move_hosts_reordering() {
     assert_eq!(cfg.hosts[0].id, id1);
     assert_eq!(cfg.hosts[1].id, id2);
     assert_eq!(cfg.hosts[2].id, id3);
+
+    // 5. Test drag-and-drop reorder: drag Host 3 (index 2) to index 0 -> Host 3, Host 1, Host 2
+    let from_idx = 2;
+    let to_idx = 0;
+    if from_idx < cfg.hosts.len() && to_idx < cfg.hosts.len() && from_idx != to_idx {
+        let item = cfg.hosts.remove(from_idx);
+        cfg.hosts.insert(to_idx, item);
+    }
+    assert_eq!(cfg.hosts[0].id, id3);
+    assert_eq!(cfg.hosts[1].id, id1);
+    assert_eq!(cfg.hosts[2].id, id2);
+
+    // 6. Test drag-and-drop reorder: drag Host 3 (index 0) to index 2 -> Host 1, Host 2, Host 3
+    let from_idx = 0;
+    let to_idx = 2;
+    if from_idx < cfg.hosts.len() && to_idx < cfg.hosts.len() && from_idx != to_idx {
+        let item = cfg.hosts.remove(from_idx);
+        cfg.hosts.insert(to_idx, item);
+    }
+    assert_eq!(cfg.hosts[0].id, id1);
+    assert_eq!(cfg.hosts[1].id, id2);
+    assert_eq!(cfg.hosts[2].id, id3);
 }
 
 #[test]
