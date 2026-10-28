@@ -343,7 +343,120 @@ impl QuickHostsApp {
     }
 }
 
+/// Minimizes the application window safely across platforms.
+///
+/// On macOS, using `ViewportCommand::Minimized(true)` causes `egui-winit` to set
+/// `ViewportInfo.minimized = Some(true)`. Because `egui-winit` skips polling `is_minimized()`
+/// at runtime on macOS (to avoid deadlocks, upstream issue #3494 / #8246), `ViewportInfo.minimized`
+/// remains stuck at `Some(true)` after the window is restored from the Dock, causing `eframe`
+/// to treat the window as permanently invisible and skip calling `App::ui`.
+///
+/// To prevent this on macOS, we trigger native AppKit window miniaturization (`performMiniaturize:`),
+/// which matches the behavior of clicking the window's top-left minimize button.
+pub fn minimize_window(ctx: &egui::Context) {
+    #[cfg(target_os = "macos")]
+    {
+        if !minimize_macos_window() {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn minimize_macos_window() -> bool {
+    use std::ffi::c_void;
+
+    #[link(name = "AppKit", kind = "framework")]
+    extern "C" {
+        fn objc_getClass(name: *const std::ffi::c_char) -> *mut c_void;
+        fn sel_registerName(name: *const std::ffi::c_char) -> *mut c_void;
+        fn objc_msgSend();
+    }
+
+    // SAFETY: We invoke standard AppKit methods on the main thread to miniaturize
+    // the active key/main window. The selectors and classes are standard AppKit APIs.
+    unsafe {
+        let app_cls = objc_getClass(c"NSApplication".as_ptr());
+        if app_cls.is_null() {
+            return false;
+        }
+        let sel_shared_app = sel_registerName(c"sharedApplication".as_ptr());
+        let msg_send_app: unsafe extern "C" fn(*mut c_void, *mut c_void) -> *mut c_void =
+            std::mem::transmute(objc_msgSend as *const ());
+        let app = msg_send_app(app_cls, sel_shared_app);
+        if app.is_null() {
+            return false;
+        }
+
+        let sel_key_win = sel_registerName(c"keyWindow".as_ptr());
+        let mut win = msg_send_app(app, sel_key_win);
+        if win.is_null() {
+            let sel_main_win = sel_registerName(c"mainWindow".as_ptr());
+            win = msg_send_app(app, sel_main_win);
+        }
+
+        let sel_perf_min = sel_registerName(c"performMiniaturize:".as_ptr());
+        let msg_send_action: unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void) =
+            std::mem::transmute(objc_msgSend as *const ());
+
+        if !win.is_null() {
+            msg_send_action(win, sel_perf_min, std::ptr::null_mut());
+            true
+        } else {
+            let sel_send_action = sel_registerName(c"sendAction:to:from:".as_ptr());
+            let msg_send_bool: unsafe extern "C" fn(
+                *mut c_void,
+                *mut c_void,
+                *mut c_void,
+                *mut c_void,
+                *mut c_void,
+            ) -> bool = std::mem::transmute(objc_msgSend as *const ());
+            msg_send_bool(
+                app,
+                sel_send_action,
+                sel_perf_min,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
+        }
+    }
+}
+
 impl eframe::App for QuickHostsApp {
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        #[cfg(target_os = "macos")]
+        {
+            // Fallback recovery for upstream egui macOS issue (emilk/egui #8246):
+            // If the window was programmatically minimized and later restored/focused,
+            // egui's ViewportInfo.minimized can remain stuck at `Some(true)`.
+            // Sending `Minimized(false)` resets ViewportInfo.minimized back to `Some(false)`,
+            // allowing `App::ui` to resume rendering immediately.
+            let needs_restore = ctx.input(|i| {
+                i.viewport().minimized == Some(true)
+                    && (i.viewport().focused == Some(true)
+                        || i.raw.events.iter().any(|e| {
+                            matches!(
+                                e,
+                                egui::Event::WindowFocused(true)
+                                    | egui::Event::PointerMoved(_)
+                                    | egui::Event::PointerButton { .. }
+                            )
+                        }))
+            });
+            if needs_restore {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+            }
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = ctx;
+        }
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // Command+W (macOS) / Ctrl+W (Windows/Linux) shortcut to close window or dialog
         let close_requested = ui.input(|i| i.viewport().close_requested())
@@ -406,11 +519,11 @@ impl eframe::App for QuickHostsApp {
         let minimize_requested = ui.input_mut(|i| {
             i.consume_key(egui::Modifiers::COMMAND, egui::Key::M)
                 || i.consume_key(egui::Modifiers::MAC_CMD, egui::Key::M)
+                || i.consume_key(egui::Modifiers::CTRL, egui::Key::M)
         });
 
         if minimize_requested {
-            ui.ctx()
-                .send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+            minimize_window(ui.ctx());
         }
 
         // Auto-dismiss expired toast

@@ -663,3 +663,60 @@ fn test_close_shortcut_modifiers() {
         assert!(close_requested, "Ctrl+W should be detected");
     });
 }
+
+#[test]
+fn test_minimize_shortcut_modifiers() {
+    let ctx = egui::Context::default();
+
+    // 1. Test Command+M (macOS event simulation)
+    let mut raw_mac = egui::RawInput::default();
+    raw_mac.events.push(egui::Event::Key {
+        key: egui::Key::M,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers {
+            alt: false,
+            ctrl: false,
+            shift: false,
+            mac_cmd: true,
+            command: true,
+        },
+    });
+
+    let _ = ctx.run_ui(raw_mac, |ui| {
+        let minimize_requested = ui.input_mut(|i| {
+            i.consume_key(egui::Modifiers::COMMAND, egui::Key::M)
+                || i.consume_key(egui::Modifiers::MAC_CMD, egui::Key::M)
+                || i.consume_key(egui::Modifiers::CTRL, egui::Key::M)
+        });
+        assert!(minimize_requested, "Command+M on macOS should be detected");
+        quickhosts::ui::minimize_window(ui.ctx());
+    });
+
+    // 2. Test Ctrl+M (Windows/Linux or Mac Ctrl key simulation)
+    let mut raw_ctrl = egui::RawInput::default();
+    raw_ctrl.events.push(egui::Event::Key {
+        key: egui::Key::M,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers {
+            alt: false,
+            ctrl: true,
+            shift: false,
+            mac_cmd: false,
+            command: false,
+        },
+    });
+
+    let _ = ctx.run_ui(raw_ctrl, |ui| {
+        let minimize_requested = ui.input_mut(|i| {
+            i.consume_key(egui::Modifiers::COMMAND, egui::Key::M)
+                || i.consume_key(egui::Modifiers::MAC_CMD, egui::Key::M)
+                || i.consume_key(egui::Modifiers::CTRL, egui::Key::M)
+        });
+        assert!(minimize_requested, "Ctrl+M should be detected");
+        quickhosts::ui::minimize_window(ui.ctx());
+    });
+}

@@ -413,10 +413,11 @@ pub fn render_custom_dialog_overlay(
         let minimize_dialog = ctx.input_mut(|i| {
             i.consume_key(egui::Modifiers::COMMAND, egui::Key::M)
                 || i.consume_key(egui::Modifiers::MAC_CMD, egui::Key::M)
+                || i.consume_key(egui::Modifiers::CTRL, egui::Key::M)
         });
 
         if minimize_dialog {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+            super::minimize_window(ctx);
         }
 
         egui::CentralPanel::default()
