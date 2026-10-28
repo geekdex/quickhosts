@@ -242,7 +242,11 @@ impl QuickHostsApp {
                 ));
                 if notify {
                     self.show_toast(
-                        format!("{}: {}", tr(&self.config.language, "toast_apply_failed"), err),
+                        format!(
+                            "{}: {}",
+                            tr(&self.config.language, "toast_apply_failed"),
+                            err
+                        ),
                         widgets::ToastKind::Error,
                     );
                 }
@@ -305,7 +309,11 @@ impl QuickHostsApp {
                     }
                     self.status_message = Some((format!("⚠️ Remote fetch error: {}", error), true));
                     self.show_toast(
-                        format!("{}: {}", tr(&self.config.language, "toast_remote_fetch_failed"), error),
+                        format!(
+                            "{}: {}",
+                            tr(&self.config.language, "toast_remote_fetch_failed"),
+                            error
+                        ),
                         widgets::ToastKind::Error,
                     );
                 }
@@ -313,7 +321,11 @@ impl QuickHostsApp {
                     self.status_message = Some((msg.clone(), !success));
                     self.show_toast(
                         msg,
-                        if success { widgets::ToastKind::Success } else { widgets::ToastKind::Error },
+                        if success {
+                            widgets::ToastKind::Success
+                        } else {
+                            widgets::ToastKind::Error
+                        },
                     );
                 }
                 AsyncMessage::InstanceFocusRequested => {
@@ -334,16 +346,59 @@ impl QuickHostsApp {
 impl eframe::App for QuickHostsApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // Command+W (macOS) / Ctrl+W (Windows/Linux) shortcut to close window or dialog
-        let close_requested = ui.input_mut(|i| {
-            i.consume_key(egui::Modifiers::COMMAND, egui::Key::W)
-                || i.consume_key(egui::Modifiers::MAC_CMD, egui::Key::W)
-        });
+        let close_requested = ui.input(|i| i.viewport().close_requested())
+            || ui.input_mut(|i| {
+                i.consume_key(egui::Modifiers::COMMAND, egui::Key::W)
+                    || i.consume_key(egui::Modifiers::MAC_CMD, egui::Key::W)
+                    || i.consume_key(egui::Modifiers::CTRL, egui::Key::W)
+            });
 
         if close_requested {
             if self.dialog_state.mode != dialogs::DialogMode::None {
                 self.dialog_state.close();
             } else {
+                let _ = save_config(&self.config);
+                drop(self._instance_guard.take());
                 ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                #[cfg(target_os = "macos")]
+                {
+                    std::process::exit(0);
+                }
+            }
+        }
+
+        // Alt+ArrowUp / Alt+ArrowDown to move selected host up/down
+        let (move_up_shortcut, move_down_shortcut) = ui.input_mut(|i| {
+            let up = i.consume_key(egui::Modifiers::ALT, egui::Key::ArrowUp);
+            let down = i.consume_key(egui::Modifiers::ALT, egui::Key::ArrowDown);
+            (up, down)
+        });
+
+        if move_up_shortcut {
+            if let Some(selected_id) = &self.config.selected_host_id {
+                if let Some(pos) = self.config.hosts.iter().position(|h| &h.id == selected_id) {
+                    if pos > 0 {
+                        self.config.hosts.swap(pos, pos - 1);
+                        let _ = save_config(&self.config);
+                        if self.config.auto_apply_on_change {
+                            self.apply_system_hosts(false);
+                        }
+                    }
+                }
+            }
+        }
+
+        if move_down_shortcut {
+            if let Some(selected_id) = &self.config.selected_host_id {
+                if let Some(pos) = self.config.hosts.iter().position(|h| &h.id == selected_id) {
+                    if pos + 1 < self.config.hosts.len() {
+                        self.config.hosts.swap(pos, pos + 1);
+                        let _ = save_config(&self.config);
+                        if self.config.auto_apply_on_change {
+                            self.apply_system_hosts(false);
+                        }
+                    }
+                }
             }
         }
 
@@ -354,7 +409,8 @@ impl eframe::App for QuickHostsApp {
         });
 
         if minimize_requested {
-            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+            ui.ctx()
+                .send_viewport_cmd(egui::ViewportCommand::Minimized(true));
         }
 
         // Auto-dismiss expired toast
@@ -599,6 +655,30 @@ impl eframe::App for QuickHostsApp {
                                     content,
                                     &self.config,
                                 );
+                            }
+                        }
+                    }
+                    if let Some(id) = action.move_up_id {
+                        if let Some(pos) = self.config.hosts.iter().position(|h| h.id == id) {
+                            if pos > 0 {
+                                self.config.hosts.swap(pos, pos - 1);
+                                self.config.selected_host_id = Some(id);
+                                let _ = save_config(&self.config);
+                                if self.config.auto_apply_on_change {
+                                    self.apply_system_hosts(false);
+                                }
+                            }
+                        }
+                    }
+                    if let Some(id) = action.move_down_id {
+                        if let Some(pos) = self.config.hosts.iter().position(|h| h.id == id) {
+                            if pos + 1 < self.config.hosts.len() {
+                                self.config.hosts.swap(pos, pos + 1);
+                                self.config.selected_host_id = Some(id);
+                                let _ = save_config(&self.config);
+                                if self.config.auto_apply_on_change {
+                                    self.apply_system_hosts(false);
+                                }
                             }
                         }
                     }

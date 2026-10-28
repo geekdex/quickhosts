@@ -408,11 +408,7 @@ impl Toast {
     }
 }
 
-pub fn render_toast_overlay(
-    ctx: &egui::Context,
-    toast: &Option<Toast>,
-    theme: &SwitchHostsTheme,
-) {
+pub fn render_toast_overlay(ctx: &egui::Context, toast: &Option<Toast>, theme: &SwitchHostsTheme) {
     let Some(t) = toast else {
         return;
     };
@@ -498,4 +494,3 @@ pub fn render_toast_overlay(
                 });
         });
 }
-

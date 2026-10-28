@@ -99,11 +99,15 @@ pub fn render_sidebar(
             .auto_shrink([false; 2])
             .show(ui, |ui| {
                 let filter_q = search_query.to_lowercase();
+                let hosts_len = hosts.len();
 
-                for host in hosts.iter_mut() {
+                for (idx, host) in hosts.iter_mut().enumerate() {
                     if !filter_q.is_empty() && !host.title.to_lowercase().contains(&filter_q) {
                         continue;
                     }
+
+                    let can_move_up = idx > 0;
+                    let can_move_down = idx + 1 < hosts_len;
 
                     let is_selected = selected_id.as_deref() == Some(&host.id);
 
@@ -126,6 +130,30 @@ pub fn render_sidebar(
                     if row_interact.clicked() {
                         action.selected_id = Some(host.id.clone());
                     }
+
+                    // Context menu (right-click) for position adjustment
+                    row_interact.context_menu(|ui| {
+                        ui.set_min_width(120.0);
+                        if ui
+                            .add_enabled(can_move_up, egui::Button::new(tr(lang, "menu_move_up")))
+                            .clicked()
+                        {
+                            action.move_up_id = Some(host.id.clone());
+                            action.selected_id = Some(host.id.clone());
+                            ui.close_kind(egui::UiKind::Menu);
+                        }
+                        if ui
+                            .add_enabled(
+                                can_move_down,
+                                egui::Button::new(tr(lang, "menu_move_down")),
+                            )
+                            .clicked()
+                        {
+                            action.move_down_id = Some(host.id.clone());
+                            action.selected_id = Some(host.id.clone());
+                            ui.close_kind(egui::UiKind::Menu);
+                        }
+                    });
 
                     let bg_color = if is_selected {
                         theme.primary
@@ -168,8 +196,10 @@ pub fn render_sidebar(
                         ui.horizontal(|ui| {
                             let available_w = ui.available_width();
                             let switch_w = 36.0;
+                            let move_btns_w = if is_hovered { 34.0 } else { 0.0 };
                             let spacing = 8.0;
-                            let label_max_w = (available_w - switch_w - spacing).max(10.0);
+                            let label_max_w =
+                                (available_w - switch_w - move_btns_w - spacing).max(10.0);
 
                             let mut label_text =
                                 egui::RichText::new(format!("{} {}", icon, host.title))
@@ -193,7 +223,7 @@ pub fn render_sidebar(
                                 },
                             );
 
-                            // Right-aligned Toggle Switch
+                            // Right-aligned Toggle Switch and position adjustment buttons
                             ui.with_layout(
                                 egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {
@@ -203,6 +233,57 @@ pub fn render_sidebar(
                                         host.enabled = enabled;
                                         action.state_changed = true;
                                         action.selected_id = Some(host.id.clone());
+                                    }
+
+                                    if is_hovered {
+                                        ui.add_space(2.0);
+                                        let btn_color = if is_selected {
+                                            Color32::WHITE
+                                        } else {
+                                            theme.text_secondary
+                                        };
+
+                                        if can_move_down {
+                                            let down_btn = ui.add(
+                                                egui::Button::new(
+                                                    egui::RichText::new("▼")
+                                                        .size(9.5)
+                                                        .color(btn_color),
+                                                )
+                                                .frame(false)
+                                                .min_size(egui::vec2(14.0, 18.0)),
+                                            );
+                                            if down_btn
+                                                .on_hover_text(tr(lang, "menu_move_down"))
+                                                .clicked()
+                                            {
+                                                action.move_down_id = Some(host.id.clone());
+                                                action.selected_id = Some(host.id.clone());
+                                            }
+                                        } else {
+                                            ui.add_space(14.0);
+                                        }
+
+                                        if can_move_up {
+                                            let up_btn = ui.add(
+                                                egui::Button::new(
+                                                    egui::RichText::new("▲")
+                                                        .size(9.5)
+                                                        .color(btn_color),
+                                                )
+                                                .frame(false)
+                                                .min_size(egui::vec2(14.0, 18.0)),
+                                            );
+                                            if up_btn
+                                                .on_hover_text(tr(lang, "menu_move_up"))
+                                                .clicked()
+                                            {
+                                                action.move_up_id = Some(host.id.clone());
+                                                action.selected_id = Some(host.id.clone());
+                                            }
+                                        } else {
+                                            ui.add_space(14.0);
+                                        }
                                     }
                                 },
                             );

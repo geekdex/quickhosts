@@ -165,6 +165,8 @@ pub fn tr<'a>(lang: &Language, key: &'a str) -> &'a str {
             "toast_log_copied" => "日志已复制到剪贴板！",
             "toast_remote_fetch_success" => "远程 Hosts 同步成功！",
             "toast_remote_fetch_failed" => "远程 Hosts 同步失败",
+            "menu_move_up" => "⬆ 上移",
+            "menu_move_down" => "⬇ 下移",
             _ => key,
         },
         Language::En | Language::System => match key {
@@ -282,6 +284,8 @@ pub fn tr<'a>(lang: &Language, key: &'a str) -> &'a str {
             "toast_log_copied" => "Logs copied to clipboard!",
             "toast_remote_fetch_success" => "Remote hosts synced successfully!",
             "toast_remote_fetch_failed" => "Remote hosts sync failed",
+            "menu_move_up" => "⬆ Move Up",
+            "menu_move_down" => "⬇ Move Down",
             _ => key,
         },
 

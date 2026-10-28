@@ -445,29 +445,199 @@ fn test_icon_assets_transparency() {
 
     let check_icon = |path: &str, expected_size: (u32, u32)| {
         let bytes = std::fs::read(path).unwrap_or_else(|_| panic!("Failed to read {}", path));
-        let img = image::load_from_memory(&bytes).unwrap_or_else(|_| panic!("Failed to load {}", path));
-        assert_eq!(img.dimensions(), expected_size, "Dimensions mismatch for {}", path);
+        let img =
+            image::load_from_memory(&bytes).unwrap_or_else(|_| panic!("Failed to load {}", path));
+        assert_eq!(
+            img.dimensions(),
+            expected_size,
+            "Dimensions mismatch for {}",
+            path
+        );
         let rgba = img.to_rgba8();
         let (w, h) = rgba.dimensions();
 
         // Ensure all 4 outer corners are transparent (alpha == 0)
-        assert_eq!(rgba.get_pixel(0, 0)[3], 0, "Top-left corner not transparent for {}", path);
-        assert_eq!(rgba.get_pixel(w - 1, 0)[3], 0, "Top-right corner not transparent for {}", path);
-        assert_eq!(rgba.get_pixel(0, h - 1)[3], 0, "Bottom-left corner not transparent for {}", path);
-        assert_eq!(rgba.get_pixel(w - 1, h - 1)[3], 0, "Bottom-right corner not transparent for {}", path);
+        assert_eq!(
+            rgba.get_pixel(0, 0)[3],
+            0,
+            "Top-left corner not transparent for {}",
+            path
+        );
+        assert_eq!(
+            rgba.get_pixel(w - 1, 0)[3],
+            0,
+            "Top-right corner not transparent for {}",
+            path
+        );
+        assert_eq!(
+            rgba.get_pixel(0, h - 1)[3],
+            0,
+            "Bottom-left corner not transparent for {}",
+            path
+        );
+        assert_eq!(
+            rgba.get_pixel(w - 1, h - 1)[3],
+            0,
+            "Bottom-right corner not transparent for {}",
+            path
+        );
 
         // Ensure center pixel is non-transparent
-        assert!(rgba.get_pixel(w / 2, h / 2)[3] > 200, "Center should be opaque for {}", path);
+        assert!(
+            rgba.get_pixel(w / 2, h / 2)[3] > 200,
+            "Center should be opaque for {}",
+            path
+        );
     };
 
     check_icon("icon.png", (1024, 1024));
-    check_icon("assets/icons/512x512/apps/io.github.geekdex.quickhosts.png", (512, 512));
-    check_icon("assets/icons/256x256/apps/io.github.geekdex.quickhosts.png", (256, 256));
-    check_icon("assets/pixmaps/io.github.geekdex.quickhosts.png", (256, 256));
-    check_icon("assets/icons/128x128/apps/io.github.geekdex.quickhosts.png", (128, 128));
-    check_icon("assets/icons/64x64/apps/io.github.geekdex.quickhosts.png", (64, 64));
-    check_icon("assets/icons/48x48/apps/io.github.geekdex.quickhosts.png", (48, 48));
-    check_icon("assets/icons/32x32/apps/io.github.geekdex.quickhosts.png", (32, 32));
-    check_icon("assets/icons/16x16/apps/io.github.geekdex.quickhosts.png", (16, 16));
+    check_icon(
+        "assets/icons/512x512/apps/io.github.geekdex.quickhosts.png",
+        (512, 512),
+    );
+    check_icon(
+        "assets/icons/256x256/apps/io.github.geekdex.quickhosts.png",
+        (256, 256),
+    );
+    check_icon(
+        "assets/pixmaps/io.github.geekdex.quickhosts.png",
+        (256, 256),
+    );
+    check_icon(
+        "assets/icons/128x128/apps/io.github.geekdex.quickhosts.png",
+        (128, 128),
+    );
+    check_icon(
+        "assets/icons/64x64/apps/io.github.geekdex.quickhosts.png",
+        (64, 64),
+    );
+    check_icon(
+        "assets/icons/48x48/apps/io.github.geekdex.quickhosts.png",
+        (48, 48),
+    );
+    check_icon(
+        "assets/icons/32x32/apps/io.github.geekdex.quickhosts.png",
+        (32, 32),
+    );
+    check_icon(
+        "assets/icons/16x16/apps/io.github.geekdex.quickhosts.png",
+        (16, 16),
+    );
 }
 
+#[test]
+fn test_move_hosts_reordering() {
+    let mut cfg = AppConfig {
+        hosts: vec![
+            HostItem::new_local("Host 1".to_string(), "1.1.1.1 h1.local\n".to_string()),
+            HostItem::new_local("Host 2".to_string(), "2.2.2.2 h2.local\n".to_string()),
+            HostItem::new_local("Host 3".to_string(), "3.3.3.3 h3.local\n".to_string()),
+        ],
+        ..Default::default()
+    };
+
+    let id1 = cfg.hosts[0].id.clone();
+    let id2 = cfg.hosts[1].id.clone();
+    let id3 = cfg.hosts[2].id.clone();
+
+    // 1. Moving top item up should do nothing (boundary check)
+    let pos0 = cfg.hosts.iter().position(|h| h.id == id1).unwrap();
+    assert_eq!(pos0, 0);
+    if pos0 > 0 {
+        cfg.hosts.swap(pos0, pos0 - 1);
+    }
+    assert_eq!(cfg.hosts[0].id, id1);
+
+    // 2. Moving bottom item down should do nothing (boundary check)
+    let pos2 = cfg.hosts.iter().position(|h| h.id == id3).unwrap();
+    assert_eq!(pos2, 2);
+    if pos2 + 1 < cfg.hosts.len() {
+        cfg.hosts.swap(pos2, pos2 + 1);
+    }
+    assert_eq!(cfg.hosts[2].id, id3);
+
+    // 3. Move Host 2 up -> Host 2, Host 1, Host 3
+    let pos1 = cfg.hosts.iter().position(|h| h.id == id2).unwrap();
+    if pos1 > 0 {
+        cfg.hosts.swap(pos1, pos1 - 1);
+    }
+    assert_eq!(cfg.hosts[0].id, id2);
+    assert_eq!(cfg.hosts[1].id, id1);
+    assert_eq!(cfg.hosts[2].id, id3);
+
+    // Combined hosts output should have Host 2 content before Host 1
+    let active_refs: Vec<&HostItem> = cfg.hosts.iter().collect();
+    let combined = build_combined_hosts(true, &active_refs);
+    let idx_h2 = combined.find("2.2.2.2 h2.local").unwrap();
+    let idx_h1 = combined.find("1.1.1.1 h1.local").unwrap();
+    assert!(
+        idx_h2 < idx_h1,
+        "Host 2 should precede Host 1 after moving up"
+    );
+
+    // 4. Move Host 2 down -> Host 1, Host 2, Host 3
+    let pos_h2 = cfg.hosts.iter().position(|h| h.id == id2).unwrap();
+    if pos_h2 + 1 < cfg.hosts.len() {
+        cfg.hosts.swap(pos_h2, pos_h2 + 1);
+    }
+    assert_eq!(cfg.hosts[0].id, id1);
+    assert_eq!(cfg.hosts[1].id, id2);
+    assert_eq!(cfg.hosts[2].id, id3);
+}
+
+#[test]
+fn test_close_shortcut_modifiers() {
+    let ctx = egui::Context::default();
+
+    // 1. Test Command+W (macOS event simulation)
+    let mut raw_mac = egui::RawInput::default();
+    raw_mac.events.push(egui::Event::Key {
+        key: egui::Key::W,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers {
+            alt: false,
+            ctrl: false,
+            shift: false,
+            mac_cmd: true,
+            command: true,
+        },
+    });
+
+    let _ = ctx.run_ui(raw_mac, |ui| {
+        let close_requested = ui.input(|i| i.viewport().close_requested())
+            || ui.input_mut(|i| {
+                i.consume_key(egui::Modifiers::COMMAND, egui::Key::W)
+                    || i.consume_key(egui::Modifiers::MAC_CMD, egui::Key::W)
+                    || i.consume_key(egui::Modifiers::CTRL, egui::Key::W)
+            });
+        assert!(close_requested, "Command+W on macOS should be detected");
+    });
+
+    // 2. Test Ctrl+W (Windows/Linux or Mac Ctrl key simulation)
+    let mut raw_ctrl = egui::RawInput::default();
+    raw_ctrl.events.push(egui::Event::Key {
+        key: egui::Key::W,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers {
+            alt: false,
+            ctrl: true,
+            shift: false,
+            mac_cmd: false,
+            command: false,
+        },
+    });
+
+    let _ = ctx.run_ui(raw_ctrl, |ui| {
+        let close_requested = ui.input(|i| i.viewport().close_requested())
+            || ui.input_mut(|i| {
+                i.consume_key(egui::Modifiers::COMMAND, egui::Key::W)
+                    || i.consume_key(egui::Modifiers::MAC_CMD, egui::Key::W)
+                    || i.consume_key(egui::Modifiers::CTRL, egui::Key::W)
+            });
+        assert!(close_requested, "Ctrl+W should be detected");
+    });
+}

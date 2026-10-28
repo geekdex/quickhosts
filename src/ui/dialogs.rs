@@ -401,6 +401,7 @@ pub fn render_custom_dialog_overlay(
             || ctx.input_mut(|i| {
                 i.consume_key(egui::Modifiers::COMMAND, egui::Key::W)
                     || i.consume_key(egui::Modifiers::MAC_CMD, egui::Key::W)
+                    || i.consume_key(egui::Modifiers::CTRL, egui::Key::W)
                     || i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)
             });
 
